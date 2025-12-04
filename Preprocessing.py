@@ -5,14 +5,14 @@ import pandas as pd
 import soundfile as sf
 import noisereduce as nr
 
-# --- Step 0: Isolate Participant (The Missing Link) ---
+# --- Step 0: Isolate Participant ---
 def isolate_participant_audio(y, sr, transcript_path):
     """
     Uses the transcript CSV to keep ONLY Participant audio.
     Replaces 'Ellie' (Interviewer) audio with silence or removes it.
     """
     if not os.path.exists(transcript_path):
-        print(f"⚠️ Warning: Transcript not found at {transcript_path}")
+        print(f"Warning: Transcript not found at {transcript_path}")
         return y # Return original if no transcript (risky)
 
     df = pd.read_csv(transcript_path, sep='\t') # DAIC-WOZ transcripts are usually tab-separated
@@ -72,13 +72,13 @@ def segment_audio(y, sr, segment_length=3.0, overlap=0.5):
 
 # --- Main Processing ---
 def preprocess_audio(audio_path, transcript_path, out_dir, pid):
-    print(f"🔄 Processing Participant {pid}...")
+    print(f"Processing Participant {pid}...")
 
     try:
         # 1. Load Audio
         y, sr = librosa.load(audio_path, sr=16000)
 
-        # 2. ISOLATE PARTICIPANT (New Step)
+        # 2. Isolate Participant
         y = isolate_participant_audio(y, sr, transcript_path)
         
         if len(y) == 0:
@@ -104,16 +104,16 @@ def preprocess_audio(audio_path, transcript_path, out_dir, pid):
             for i, seg in enumerate(segments):
                 out_path = os.path.join(participant_dir, f"{pid}_seg{i}.wav")
                 sf.write(out_path, seg, sr)
-            print(f"✅ Saved {len(segments)} segments for Participant {pid}")
+            print(f"Saved {len(segments)} segments for Participant {pid}")
         else:
-            print(f"⚠️ Participant {pid} resulted in 0 segments.")
+            print(f"Participant {pid} resulted in 0 segments.")
 
     except Exception as e:
-        print(f"❌ Error processing {pid}: {e}")
+        print(f"Error processing {pid}: {e}")
 
 # --- Batch Process ---
 def process_dataset(dataset_dir, out_dir):
-    print(f"🚀 Starting preprocessing for dataset: {dataset_dir}\n")
+    print(f"Starting preprocessing for dataset: {dataset_dir}\n")
     
     for root, _, files in os.walk(dataset_dir):
         for file in files:
@@ -128,7 +128,7 @@ def process_dataset(dataset_dir, out_dir):
                 
                 preprocess_audio(audio_path, transcript_path, out_dir, pid)
                 
-    print("\n🎉 Preprocessing complete!")
+    print("\nPreprocessing complete!")
 
 if __name__ == "__main__":
     # Update paths

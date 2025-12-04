@@ -4,17 +4,15 @@ import pandas as pd
 import librosa
 from tqdm import tqdm
 
-# ================= CONFIGURATION =================
 # Path to the folder containing your segmented .wav files
 PROCESSED_AUDIO_DIR = r"C:\Users\User\Desktop\processed"
 
-# Paths to your label files (from DAIC-WOZ)
+# Paths to the label files from DIAC-WOZ folder
 TRAIN_LABELS = r"C:\Users\User\Desktop\DIAC-WOZ\train_split_Depression_AVEC2017.csv"
 DEV_LABELS = r"C:\Users\User\Desktop\DIAC-WOZ\dev_split_Depression_AVEC2017.csv"
 
-# Output file - Note the new name
+# Output file
 OUTPUT_CSV = r"C:\Users\User\Desktop\segment_level_depression_dataset.csv"
-# =================================================
 
 def calculate_jitter(f0):
     """Calculates local Jitter (pitch instability)."""
@@ -33,7 +31,7 @@ def extract_segment_features(file_path):
     try:
         y, sr = librosa.load(file_path, sr=16000)
         
-        # Skip empty or too short segments
+        # Skips empty or too short segments
         if len(y) < sr: return None
 
         # --- 1. PROSODIC FEATURES (Pitch & Voice Quality) ---
@@ -131,10 +129,10 @@ def main():
 
     # 3. SAVE
     df = pd.DataFrame(data)
-    print(f"\n✅ Extracted features from {len(df)} segments.")
+    print(f"\n Extracted features from {len(df)} segments.")
     
     df.to_csv(OUTPUT_CSV, index=False)
-    print(f"🎉 SUCCESS! Big Dataset saved to: {OUTPUT_CSV}")
+    print(f" SUCCESS! Big Dataset saved to: {OUTPUT_CSV}")
     print(f"   Total Samples: {len(df)}")
     print(f"   Class Balance: {df['PHQ8_Binary'].value_counts().to_dict()}")
 

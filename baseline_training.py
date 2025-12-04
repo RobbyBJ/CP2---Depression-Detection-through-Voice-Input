@@ -60,7 +60,7 @@ def run_baseline_training():
 
     results = []
     
-    print("\n⚔️ STARTING BASELINE TRAINING (NO TUNING)...")
+    print("\n STARTING BASELINE TRAINING (NO TUNING)...")
     
     for name, model in models_config.items():
         print(f"\n... Training {name} ...")
