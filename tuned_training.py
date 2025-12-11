@@ -2,163 +2,132 @@ import os
 import pandas as pd
 import numpy as np
 import joblib
-from sklearn.model_selection import GridSearchCV, StratifiedGroupKFold
 from sklearn.preprocessing import StandardScaler
 from sklearn.impute import SimpleImputer
-from sklearn.decomposition import PCA 
-from imblearn.pipeline import Pipeline as ImbPipeline
-from imblearn.over_sampling import SMOTE
-from sklearn.metrics import f1_score, make_scorer
-
-# --- MODELS ---
-from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.feature_selection import SelectKBest, f_classif
+from sklearn.pipeline import Pipeline
+from sklearn.model_selection import GridSearchCV, StratifiedKFold
 from sklearn.svm import SVC
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
 from sklearn.neighbors import KNeighborsClassifier
 from xgboost import XGBClassifier
 
 # ================= CONFIGURATION =================
-TRAIN_DATASET = r"C:\Users\User\Desktop\CP2\depression_train_dataset.csv"
-MODEL_SAVE_DIR = r"C:\Users\User\Desktop\CP2\tuned_models"
+TRAIN_CSV = r"C:\Users\User\Desktop\depression_train_opensmile.csv"
+MODEL_OUTPUT_DIR = r"C:\Users\User\Desktop\CP2\tuned_models_opensmile"
 RANDOM_STATE = 42
-N_JOBS = -1
-# =================================================
 
-def ensure_dir(path):
-    if not os.path.exists(path):
-        os.makedirs(path)
-
-def main():
-    print("🚀 STARTING HYPERPARAMETER TUNING PIPELINE (Wav2Vec + PCA Edition)...")
-    ensure_dir(MODEL_SAVE_DIR)
-
-    if not os.path.exists(TRAIN_DATASET):
-        print(f"❌ Error: Dataset not found at {TRAIN_DATASET}")
-        return
-
-    # 1️⃣ Load dataset
-    df = pd.read_csv(TRAIN_DATASET)
-    
-    # CRITICAL: Extract Groups before dropping columns
-    if "participant_id" in df.columns:
-        groups = df["participant_id"]
-    else:
-        print("⚠️ Warning: 'participant_id' missing. GroupKFold cannot be used (Leakage Risk!).")
-        groups = None
-
-    # Drop non-feature columns
-    X = df.drop(columns=["PHQ8_Binary", "participant_id", "filename"], errors="ignore")
-    y = df["PHQ8_Binary"]
-
-    print(f"✅ Loaded training dataset: {len(X)} samples")
-    print(f"   Features: {X.shape[1]} (Should be ~768 for Wav2Vec)")
-    print(f"   Class distribution: {y.value_counts().to_dict()}")
-
-    # 2️⃣ Define models and their grids
-    param_grids = {
-        "Logistic Regression": {
-            "classifier__C": [0.01, 0.1, 1],
-            "classifier__solver": ["lbfgs"]
-        },
-        "SVM": {
-            # PCA makes SVM fast enough to try both kernels again
-            "classifier__C": [1, 10], 
-            "classifier__kernel": ["rbf"] 
-        },
-        "Random Forest": {
-            "classifier__n_estimators": [100, 200],
-            "classifier__max_depth": [10, 20],
-        },
-        "XGBoost": {
-            "classifier__n_estimators": [100, 200],
-            "classifier__learning_rate": [0.05, 0.1],
-            "classifier__max_depth": [4, 6],
-        },
-        "KNN": {
-            "classifier__n_neighbors": [5, 9],
-            "classifier__weights": ["uniform"]
+# Define the "Search Space" for each model
+# The grid search will try all combinations to find the best one for SENSITIVITY.
+MODEL_PARAMS = {
+    'SVM': {
+        'model': SVC(probability=True, random_state=RANDOM_STATE),
+        'params': {
+            'classifier__C': [0.1, 1, 10],
+            'classifier__kernel': ['rbf'],
+            'classifier__gamma': ['scale', 0.1],
+            'selector__k': [30, 40, 50]  # Let the model choose best feature count
+        }
+    },
+    'RandomForest': {
+        'model': RandomForestClassifier(random_state=RANDOM_STATE, n_jobs=-1),
+        'params': {
+            'classifier__n_estimators': [100, 200, 300],
+            'classifier__max_depth': [10, 20, None],
+            'classifier__min_samples_leaf': [1, 2, 4],
+            'selector__k': [30, 40, 50]
+        }
+    },
+    'LogisticRegression': {
+        'model': LogisticRegression(random_state=RANDOM_STATE, max_iter=2000),
+        'params': {
+            'classifier__C': [0.01, 0.1, 1, 10],
+            'classifier__solver': ['liblinear', 'lbfgs'],
+            'selector__k': [30, 40, 50]
+        }
+    },
+    'KNN': {
+        'model': KNeighborsClassifier(),
+        'params': {
+            'classifier__n_neighbors': [5, 7, 9, 13],
+            'classifier__weights': ['uniform', 'distance'],
+            'selector__k': [30, 40, 50]
+        }
+    },
+    'XGBoost': {
+        'model': XGBClassifier(tree_method='hist', eval_metric='logloss', random_state=RANDOM_STATE),
+        'params': {
+            'classifier__learning_rate': [0.01, 0.1, 0.2],
+            'classifier__max_depth': [3, 5, 7],
+            'classifier__n_estimators': [100, 200],
+            'selector__k': [30, 40, 50]
         }
     }
+}
+# =================================================
 
-    base_models = {
-        "Logistic Regression": LogisticRegression(max_iter=1000, class_weight="balanced", random_state=RANDOM_STATE),
-        "SVM": SVC(probability=True, class_weight="balanced", random_state=RANDOM_STATE),
-        "Random Forest": RandomForestClassifier(class_weight="balanced", random_state=RANDOM_STATE),
-        "KNN": KNeighborsClassifier(),
-        "XGBoost": XGBClassifier(
-            random_state=RANDOM_STATE,
-            tree_method="hist",
-            eval_metric="logloss",
-        )
-    }
+os.makedirs(MODEL_OUTPUT_DIR, exist_ok=True)
 
-    results = []
+def run_tuning():
+    print("🚀 LOADING TRAIN DATA (Segment-Level)...")
+    if not os.path.exists(TRAIN_CSV):
+        print(f"❌ Error: {TRAIN_CSV} not found.")
+        return
 
-    # 3️⃣ Perform tuning for each model
-    for name, model in base_models.items():
-        print(f"\n🔍 Tuning {name}...")
+    df_train = pd.read_csv(TRAIN_CSV)
+    
+    # Drop metadata for training
+    X_train = df_train.drop(columns=['PHQ8_Binary', 'participant_id', 'filename'], errors='ignore')
+    y_train = df_train['PHQ8_Binary']
 
-        # --- BUILD PIPELINE DYNAMICALLY ---
-        # 1. Base steps (Imputer -> Scaler -> SMOTE)
-        steps = [
-            ("imputer", SimpleImputer(strategy="mean")),
-            ("scaler", StandardScaler()),
-            ("smote", SMOTE(random_state=RANDOM_STATE)),
-        ]
+    print(f"✅ Tuning on {len(X_train)} segments.")
+    print(f"   Class Balance: {y_train.value_counts().to_dict()}")
+
+    print("\n⚔️ STARTING HYPERPARAMETER TUNING (Optimizing for RECALL/SENSITIVITY)...")
+
+    # Use Stratified K-Fold to maintain class balance in validation splits
+    cv = StratifiedKFold(n_splits=3, shuffle=True, random_state=RANDOM_STATE)
+
+    for name, config in MODEL_PARAMS.items():
+        print(f"\n🧩 Tuning {name}...")
         
-        # 2. OPTIMIZATION: Add PCA only for slow models (SVM & KNN)
-        if name in ["SVM", "KNN"]:
-            print(f"   👉 Adding PCA (0.95 variance) to speed up {name}...")
-            steps.append(("pca", PCA(n_components=0.90))) 
+        # 1. Define Pipeline
+        pipeline = Pipeline([
+            ('imputer', SimpleImputer(strategy='mean')),
+            ('scaler', StandardScaler()),
+            ('selector', SelectKBest(score_func=f_classif)), # k is tuned in grid
+            ('classifier', config['model'])
+        ])
 
-        # 3. Add the classifier
-        steps.append(("classifier", model))
-
-        pipeline = ImbPipeline(steps)
-
-        # 4. Stratified Group K-Fold (Prevents Leakage)
-        cv_strategy = StratifiedGroupKFold(n_splits=5)
-
+        # 2. Setup Grid Search
+        # scoring='recall' forces the model to pick params that minimize False Negatives
         grid = GridSearchCV(
-            estimator=pipeline,
-            param_grid=param_grids.get(name, {}),
-            scoring=make_scorer(f1_score),
-            n_jobs=N_JOBS,
-            cv=cv_strategy, 
-            verbose=2
+            pipeline, 
+            config['params'], 
+            cv=cv, 
+            scoring='recall', 
+            n_jobs=-1, 
+            verbose=1
         )
 
-        # 5. Fit with Groups
-        if groups is not None:
-            grid.fit(X, y, groups=groups)
-        else:
-            grid.fit(X, y)
+        try:
+            # 3. Run Tuning
+            grid.fit(X_train, y_train)
+            
+            # 4. Report Results
+            print(f"   🏆 Best Params: {grid.best_params_}")
+            print(f"   🏆 Best Recall Score (CV): {grid.best_score_:.2%}")
+            
+            # 5. Save Best Model
+            save_path = os.path.join(MODEL_OUTPUT_DIR, f"{name}_tuned_v8.pkl")
+            joblib.dump(grid.best_estimator_, save_path)
+            print(f"   ✅ Saved: {save_path}")
 
-        best_model = grid.best_estimator_
-        best_params = grid.best_params_
-        best_score = grid.best_score_
+        except Exception as e:
+            print(f"   ❌ Failed {name}: {e}")
 
-        print(f"✅ Best F1-score: {best_score:.4f}")
-        print(f"🏆 Best Parameters: {best_params}")
-
-        # Save tuned model
-        save_path = os.path.join(MODEL_SAVE_DIR, f"tuned_{name.replace(' ', '_')}.pkl")
-        joblib.dump(best_model, save_path)
-        print(f"💾 Saved model to: {save_path}")
-
-        results.append({
-            "Model": name,
-            "Best F1-Score": best_score,
-            "Best Params": best_params
-        })
-
-    # 4️⃣ Save all results
-    results_df = pd.DataFrame(results)
-    results_df = results_df.sort_values(by="Best F1-Score", ascending=False)
-    results_df.to_csv(os.path.join(MODEL_SAVE_DIR, "tuned_model_summary.csv"), index=False)
-
-    print("\n🏁 All models tuned and saved successfully!")
-    print(results_df)
+    print("\n🎉 Tuning Complete. Now run your 'test_v8_voting_final.py' on these new models!")
 
 if __name__ == "__main__":
-    main()
+    run_tuning()

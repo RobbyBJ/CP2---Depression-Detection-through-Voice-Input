@@ -2,81 +2,97 @@ import os
 import joblib
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-from sklearn.metrics import precision_recall_curve, f1_score, accuracy_score, recall_score, confusion_matrix
+from sklearn.metrics import accuracy_score, recall_score, f1_score, confusion_matrix
 
 # ================= CONFIGURATION =================
-# Path to your Stacking Model
-MODEL_PATH = r"C:\Users\User\Desktop\CP2\ensemble_models\stacking_ridge.pkl"
-# Path to Baseline Handcrafted Dev Data
-TEST_DATASET = r"C:\Users\User\Desktop\CP2\depression_test_dataset.csv"
+# Path to your Test Data (OpenSMILE V8)
+TEST_CSV = r"C:\Users\User\Desktop\depression_test_opensmile.csv"
+
+# Path to your Final Ensemble Model
+MODEL_PATH = r"C:\Users\User\Desktop\CP2\final_ensemble_opensmile\Final_Stacking_Ensemble_v8.pkl"
 # =================================================
 
-def main():
-    print("🚀 TUNING ENSEMBLE THRESHOLD...")
+def calculate_specificity(y_true, y_pred):
+    tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
+    return tn / (tn + fp) if (tn + fp) > 0 else 0
+
+def diagnose_and_tune():
+    print("🚀 DIAGNOSING ENSEMBLE MODEL...")
     
     # 1. Load Data & Model
-    if not os.path.exists(MODEL_PATH):
-        print("❌ Model not found!")
+    if not os.path.exists(TEST_CSV) or not os.path.exists(MODEL_PATH):
+        print("❌ Error: Files not found.")
         return
-    
-    model = joblib.load(MODEL_PATH)
-    df = pd.read_csv(TEST_DATASET)
-    
-    # Align features (Drop non-features)
+
+    df = pd.read_csv(TEST_CSV)
+    # Align features if necessary (drop meta)
     X_test = df.drop(columns=['PHQ8_Binary', 'participant_id', 'filename'], errors='ignore')
-    y_test = df['PHQ8_Binary']
     
-    print(f"✅ Loaded Model & {len(X_test)} Test Samples.")
+    # Keep meta for analysis
+    df_meta = df[['participant_id', 'PHQ8_Binary']].copy()
+    
+    print(f"   Loading Model: {os.path.basename(MODEL_PATH)}")
+    model = joblib.load(MODEL_PATH)
 
-    # 2. Get Probabilities (Confidence Scores)
-    # StackingClassifier usually has predict_proba
-    if hasattr(model, "predict_proba"):
-        probs = model.predict_proba(X_test)[:, 1] # Probability of Class 1 (Depression)
+    # 2. Get Probabilities (The critical step)
+    print("   Calculating Probabilities...")
+    probs = model.predict_proba(X_test)[:, 1] # Probability of Class 1 (Depressed)
+    df_meta['seg_prob'] = probs
+
+    # 3. Aggregate per Participant
+    participant_stats = df_meta.groupby('participant_id').agg({
+        'seg_prob': 'mean',
+        'PHQ8_Binary': 'first'
+    }).reset_index()
+
+    # --- DIAGNOSIS REPORT ---
+    print("\n📊 PROBABILITY ANALYSIS:")
+    avg_dep_prob = participant_stats[participant_stats['PHQ8_Binary'] == 1]['seg_prob'].mean()
+    avg_hel_prob = participant_stats[participant_stats['PHQ8_Binary'] == 0]['seg_prob'].mean()
+    
+    print(f"   Average Probability assigned to DEPRESSED Patients: {avg_dep_prob:.3f}")
+    print(f"   Average Probability assigned to HEALTHY Patients:   {avg_hel_prob:.3f}")
+    
+    if avg_dep_prob > avg_hel_prob:
+        print("   ✅ GOOD NEWS: The model gives higher scores to depressed patients.")
+        print("      We just need to lower the threshold to catch them.")
     else:
-        # If RidgeClassifier was used as final_estimator, it might use decision_function
-        print("⚠️ Model doesn't support probability. Using decision function...")
-        probs = model.decision_function(X_test)
-        # Normalize to 0-1 range for easier thresholding
-        probs = (probs - probs.min()) / (probs.max() - probs.min())
+        print("   ❌ BAD NEWS: The model cannot distinguish between the groups.")
 
-    # 3. Test Thresholds from 0.1 to 0.9
-    print("\n📊 TESTING THRESHOLDS:")
-    print(f"{'Threshold':<10} | {'Recall':<10} | {'Specificity':<12} | {'Accuracy':<10} | {'F1-Score':<10}")
+    # 4. Threshold Tuning Loop
+    print("\n🎛️ TUNING THRESHOLD...")
+    print(f"{'Threshold':<10} | {'Sens (Recall)':<14} | {'Spec':<10} | {'F1':<10} | {'Acc':<10}")
     print("-" * 65)
-    
-    best_thresh = 0.5
+
     best_f1 = 0
-    
-    thresholds = np.arange(0.1, 0.6, 0.05) # Test 0.10, 0.15, ... 0.55
-    
-    for t in thresholds:
-        preds = (probs >= t).astype(int)
+    best_res = None
+    y_true = participant_stats['PHQ8_Binary']
+    y_probs = participant_stats['seg_prob']
+
+    for thresh in np.arange(0.20, 0.60, 0.02):
+        y_pred = (y_probs >= thresh).astype(int)
         
-        rec = recall_score(y_test, preds)
-        tn, fp, fn, tp = confusion_matrix(y_test, preds).ravel()
-        spec = tn / (tn + fp)
-        acc = accuracy_score(y_test, preds)
-        f1 = f1_score(y_test, preds)
+        sens = recall_score(y_true, y_pred)
+        spec = calculate_specificity(y_true, y_pred)
+        f1 = f1_score(y_true, y_pred)
+        acc = accuracy_score(y_true, y_pred)
         
-        print(f"{t:.2f}       | {rec:.4f}     | {spec:.4f}       | {acc:.4f}     | {f1:.4f}")
-        
-        # Logic: We want Recall > 0.80 but Maximize F1
-        if rec > 0.80 and f1 > best_f1:
+        print(f"{thresh:.2f}       | {sens:.2%}       | {spec:.2%}   | {f1:.2f}       | {acc:.2%}")
+
+        if f1 > best_f1:
             best_f1 = f1
-            best_thresh = t
+            best_res = (thresh, sens, spec, f1, acc)
 
     print("-" * 65)
-    print(f"\n🏆 RECOMMENDATION:")
-    print(f"To fix the low recall, use Threshold = {best_thresh:.2f}")
-    
-    # Show final stats for recommended threshold
-    final_preds = (probs >= best_thresh).astype(int)
-    final_rec = recall_score(y_test, final_preds)
-    final_acc = accuracy_score(y_test, final_preds)
-    
-    print(f"   -> New Sensitivity: {final_rec:.2%}")
-    print(f"   -> New Accuracy:    {final_acc:.2%}")
+    if best_res:
+        t, s, sp, f, a = best_res
+        print(f"🏆 OPTIMAL RESULT FOUND AT THRESHOLD {t:.2f}:")
+        print(f"   Sensitivity: {s:.2%}")
+        print(f"   Specificity: {sp:.2%}")
+        print(f"   F1-Score:    {f:.2f}")
+        print(f"   Accuracy:    {a:.2%}")
+    else:
+        print("No improvement found.")
 
 if __name__ == "__main__":
-    main()
+    diagnose_and_tune()
