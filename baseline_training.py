@@ -13,8 +13,8 @@ from sklearn.neighbors import KNeighborsClassifier
 from xgboost import XGBClassifier
 
 # ================= CONFIGURATION =================
-TRAIN_CSV = r"C:\Users\User\Desktop\depression_train_opensmile.csv"
-MODEL_OUTPUT_DIR = r"C:\Users\User\Desktop\CP2\baseline_model_opensmile"
+TRAIN_CSV = r"C:\Users\User\Desktop\depression_train_dataset.csv"
+MODEL_OUTPUT_DIR = r"C:\Users\User\Desktop\CP2\baseline_model"
 RANDOM_STATE = 42
 TOP_K_FEATURES = 40 
 # =================================================

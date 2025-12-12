@@ -2,33 +2,32 @@ import os
 import pandas as pd
 import numpy as np
 import opensmile
-import audiofile
 from tqdm import tqdm
 
 # ================= CONFIGURATION =================
-# Point to your V4 Augmented/Balanced Data
-PROCESSED_AUDIO_DIR = r"C:\Users\User\Desktop\processed_balanced" 
+# Point to your NEW V2 Balanced Folder
+PROCESSED_AUDIO_DIR = r"C:\Users\User\Desktop\processed_balanced_v2" 
 
+# Labels Paths
 TRAIN_LABELS = r"C:\Users\User\Desktop\DAIC-WOZ\train_split_Depression_AVEC2017.csv"
 DEV_LABELS = r"C:\Users\User\Desktop\DAIC-WOZ\dev_split_Depression_AVEC2017.csv"
+# Add Test Labels if you have them, otherwise Dev serves as Test
+# TEST_LABELS = r"C:\Users\User\Desktop\DAIC-WOZ\test_split_Depression_AVEC2017.csv"
 
-OUTPUT_TRAIN = r"C:\Users\User\Desktop\depression_train_opensmile.csv"
-OUTPUT_TEST = r"C:\Users\User\Desktop\depression_test_opensmile.csv"
+# Output Files
+OUTPUT_TRAIN = r"C:\Users\User\Desktop\CP2\depression_train_dataset_v2.csv"
+OUTPUT_TEST = r"C:\Users\User\Desktop\CP2\depression_test_dataset_v2.csv"
 
-# Logic Settings (Same as V8)
-MAX_TEST_SEGMENTS = 50 
-MIN_SEGMENTS = 5
+# Logic Settings
+MIN_SEGMENTS = 5  # Only used to skip empty/broken folders
 # =================================================
 
 def extract_opensmile_features():
-    print("🚀 Initializing OpenSMILE (eGeMAPS - The Standard for Depression)...")
-    
-    # Initialize OpenSMILE with eGeMAPS feature set (Standard for Affect/Depression)
+    print("🚀 Initializing OpenSMILE (eGeMAPS)...")
     smile = opensmile.Smile(
         feature_set=opensmile.FeatureSet.eGeMAPSv02,
         feature_level=opensmile.FeatureLevel.Functionals,
     )
-
     return smile
 
 def process_split(smile, label_file, output_csv, split_name):
@@ -38,6 +37,7 @@ def process_split(smile, label_file, output_csv, split_name):
         print(f"❌ Label file not found: {label_file}")
         return
 
+    # Load Labels
     labels = pd.read_csv(label_file)
     if 'Participant_ID' in labels.columns:
         labels.rename(columns={'Participant_ID': 'participant_id'}, inplace=True)
@@ -47,70 +47,82 @@ def process_split(smile, label_file, output_csv, split_name):
 
     all_features = []
 
+    # Walk through the entire V2 folder (Train and Test subfolders)
     for root, _, files in os.walk(PROCESSED_AUDIO_DIR):
         folder_name = os.path.basename(root)
-        if not folder_name.isdigit(): continue
+        
+        # Check if folder is a Participant ID (e.g., "300")
+        if not folder_name.isdigit(): 
+            continue
 
         pid = int(folder_name)
-        if pid not in label_map: continue
+        
+        # CRITICAL FILTER: Only process PIDs that belong to the current CSV (Train or Test)
+        if pid not in label_map: 
+            continue
 
         target_label = label_map[pid]
         all_wavs = [f for f in files if f.endswith('.wav')]
         
-        # --- SAME LOGIC AS V8 (Smart Sampling) ---
-        if split_name == "TRAIN":
-            final_files = all_wavs # Keep Augmentations
-        else:
-            final_files = [f for f in all_wavs if "_aug" not in f] # No Augmentations
-            if len(final_files) > MAX_TEST_SEGMENTS:
-                final_files = np.random.choice(final_files, MAX_TEST_SEGMENTS, replace=False)
+        # ==========================================
+        # 🧠 SELECTION LOGIC
+        # ==========================================
         
-        # Looping Logic
-        if len(final_files) < MIN_SEGMENTS:
-             if len(final_files) == 0: continue
-             needed = MIN_SEGMENTS - len(final_files)
-             extras = np.random.choice(final_files, needed, replace=True)
-             final_files = np.concatenate([final_files, extras])
+        if split_name == "TRAIN":
+            # For Training: Take EVERYTHING (Base + Augmentations)
+            # (Note: These were already capped at 50 in preprocessing)
+            final_files = all_wavs
+            
+        else: # TEST / DEV
+            # For Testing: Take EVERYTHING that isn't augmented
+            # DO NOT CAP / LIMIT. We want 100% of the segments for voting.
+            final_files = [f for f in all_wavs if "_aug" not in f]
+        
+        # Skip if folder is empty
+        if len(final_files) == 0:
+            continue
 
-        print(f"➡️ Participant {pid} ({len(final_files)} segments)")
+        print(f"➡️ Participant {pid}: Extracting {len(final_files)} segments...")
 
+        # Extract features for each segment
         for wav in tqdm(final_files, leave=False):
             full_path = os.path.join(root, wav)
             try:
-                # Extract Features using OpenSMILE
-                # It returns a DataFrame with 1 row and 88 columns
+                # OpenSMILE extraction
                 df_feat = smile.process_file(full_path)
-                
-                # Reset index to get a clean row
                 df_feat = df_feat.reset_index(drop=True)
                 
-                # Add Metadata
+                # Attach Meta
                 df_feat['participant_id'] = pid
+                df_feat['filename'] = wav
                 df_feat['PHQ8_Binary'] = target_label
                 
                 all_features.append(df_feat)
                 
-            except Exception as e:
-                pass # Skip bad files
+            except Exception:
+                pass # Skip broken files
 
+    # Save to CSV
     if all_features:
-        # Combine all rows
         final_df = pd.concat(all_features, ignore_index=True)
         final_df.to_csv(output_csv, index=False)
-        print(f"✅ {split_name} Saved: {len(final_df)} segments | {final_df.shape[1]} features")
+        print(f"✅ {split_name} Saved: {len(final_df)} total segments.")
     else:
-        print(f"⚠️ No data extracted for {split_name}")
+        print(f"⚠️ No data extracted for {split_name}. Check paths/labels.")
 
 def main():
     smile = extract_opensmile_features()
     
-    # Process Train (Augmented)
+    # 1. Process Train 
+    # (Will find files in processed_balanced_v2/train/...)
     process_split(smile, TRAIN_LABELS, OUTPUT_TRAIN, "TRAIN")
     
-    # Process Test (Balanced)
+    # 2. Process Test/Dev
+    # (Will find files in processed_balanced_v2/test/...)
+    # This ensures we get ALL valid segments for the test set
     process_split(smile, DEV_LABELS, OUTPUT_TEST, "TEST")
     
-    print("\n🎉 DONE! You now have 'Paper-Quality' features.")
+    print("\n🎉 DONE! Features extracted.")
 
 if __name__ == "__main__":
     main()

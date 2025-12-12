@@ -9,31 +9,42 @@ from scipy.signal import butter, lfilter
 from tqdm import tqdm
 
 # ================= CONFIGURATION =================
-# Update these paths to match your folder structure
 DATASET_DIR = r"C:\Users\User\Desktop\DAIC-WOZ"
-OUT_DIR = r"C:\Users\User\Desktop\processed_balanced"
+OUT_DIR = r"C:\Users\User\Desktop\processed_balanced_v2"
 
 # Path to labels
 TRAIN_LABELS = r"C:\Users\User\Desktop\DAIC-WOZ\train_split_Depression_AVEC2017.csv"
 DEV_LABELS = r"C:\Users\User\Desktop\DAIC-WOZ\dev_split_Depression_AVEC2017.csv"
 
-# --- NEW: BALANCING SETTINGS ---
-MAX_SEGMENTS_PER_PARTICIPANT = 50  # Cap everyone to this amount to prevent "loud" speakers dominating
-AUGMENT_DEPRESSED_ONLY = True      # Keep True to boost minority class
+# --- BALANCING SETTINGS (Applies to TRAIN only) ---
+MAX_SEGMENTS_PER_PARTICIPANT = 50  # Cap training data to prevent bias
+AUGMENT_DEPRESSED_ONLY = True      # Augment minority class in training
 # =================================================
 
-# --- HELPER: Load Labels ---
-def load_labels():
+# --- HELPER: Load Labels & Split Info ---
+def load_labels_and_splits():
     labels_map = {}
-    for path in [TRAIN_LABELS, DEV_LABELS]:
-        if os.path.exists(path):
-            df = pd.read_csv(path)
-            if 'Participant_ID' in df.columns:
-                df.rename(columns={'Participant_ID': 'participant_id'}, inplace=True)
-            
-            for _, row in df.iterrows():
-                labels_map[str(int(row['participant_id']))] = row['PHQ8_Binary']
-    return labels_map
+    split_map = {} # New: Tracks if a user is 'train', 'dev', or 'test'
+    
+    # 1. Load Train
+    if os.path.exists(TRAIN_LABELS):
+        df = pd.read_csv(TRAIN_LABELS)
+        if 'Participant_ID' in df.columns: df.rename(columns={'Participant_ID': 'participant_id'}, inplace=True)
+        for _, row in df.iterrows():
+            pid = str(int(row['participant_id']))
+            labels_map[pid] = row['PHQ8_Binary']
+            split_map[pid] = 'train' # Mark as TRAIN
+
+    # 2. Load Dev
+    if os.path.exists(DEV_LABELS):
+        df = pd.read_csv(DEV_LABELS)
+        if 'Participant_ID' in df.columns: df.rename(columns={'Participant_ID': 'participant_id'}, inplace=True)
+        for _, row in df.iterrows():
+            pid = str(int(row['participant_id']))
+            labels_map[pid] = row['PHQ8_Binary']
+            split_map[pid] = 'dev'   # Mark as DEV
+
+    return labels_map, split_map
 
 # --- STEP 1: Bandpass Filter ---
 def butter_bandpass(lowcut, highcut, fs, order=5):
@@ -130,8 +141,16 @@ def augment_audio(y, sr):
     return aug_segments
 
 # --- MAIN PROCESSING LOOP ---
-def preprocess_participant(audio_path, transcript_path, out_dir, pid, is_depressed):
-    print(f"Processing Participant {pid} (Depressed: {is_depressed})...")
+def preprocess_participant(audio_path, transcript_path, out_dir, pid, is_depressed, split):
+    # Determine folder based on split (Optional organization)
+    # This helps you manually check later
+    split_folder = "train" if split == "train" else "test"
+    participant_dir = os.path.join(out_dir, split_folder, pid)
+    
+    # Check if already processed to save time (Optional)
+    # if os.path.exists(participant_dir): return 
+
+    print(f"Processing {pid} ({split.upper()} | Depressed: {is_depressed})...")
 
     try:
         y, sr = librosa.load(audio_path, sr=16000)
@@ -140,52 +159,67 @@ def preprocess_participant(audio_path, transcript_path, out_dir, pid, is_depress
         y = isolate_participant_audio(y, sr, transcript_path)
         
         if len(y) == 0:
-            print(f"⚠️ {pid}: Empty.")
+            print(f"⚠️ {pid}: Empty audio.")
             return
 
         y = remove_silence(y, sr)
         y = normalize_audio(y)
         segments = segment_audio(y, sr)
 
-        # --- NEW LOGIC: DOWNSAMPLING (Speaker Balancing) ---
         if segments:
-            # If they have too many segments, randomly pick MAX_SEGMENTS
-            if len(segments) > MAX_SEGMENTS_PER_PARTICIPANT:
-                # Randomly sample, but sort indices to keep rough time order
-                selected_indices = sorted(random.sample(range(len(segments)), MAX_SEGMENTS_PER_PARTICIPANT))
-                segments = [segments[i] for i in selected_indices]
+            # ==========================================
+            # 🧠 INTELLIGENT SPLIT LOGIC
+            # ==========================================
             
-            participant_dir = os.path.join(out_dir, pid)
+            # 1. TRAINING SET: Apply Cap & Augmentation
+            if split == 'train':
+                # A. Downsample (Cap) Healthy/Depressed to avoid one speaker dominating
+                if len(segments) > MAX_SEGMENTS_PER_PARTICIPANT:
+                    selected_indices = sorted(random.sample(range(len(segments)), MAX_SEGMENTS_PER_PARTICIPANT))
+                    segments = [segments[i] for i in selected_indices]
+                    print(f"   ✂️ Downsampled (Train) to {MAX_SEGMENTS_PER_PARTICIPANT} segments.")
+                
+                # B. Augment Depressed (ONLY in Train)
+                should_augment = (AUGMENT_DEPRESSED_ONLY and is_depressed == 1)
+
+            # 2. TEST/DEV SET: Keep Everything!
+            else:
+                # Do NOT cap. Do NOT augment.
+                print(f"   🛡️ Keeping ALL {len(segments)} segments (Test Integrity).")
+                should_augment = False
+
+            # ==========================================
+            # SAVE SEGMENTS
+            # ==========================================
             os.makedirs(participant_dir, exist_ok=True)
-            
             saved_count = 0
             
             for i, seg in enumerate(segments):
-                # Save Original
+                # Save Base Segment
                 out_path = os.path.join(participant_dir, f"{pid}_seg{i}.wav")
                 sf.write(out_path, seg, sr)
                 saved_count += 1
                 
-                # --- AUGMENTATION LOGIC ---
-                # Augment AFTER capping to maximize the impact of the depressed class
-                if AUGMENT_DEPRESSED_ONLY and is_depressed == 1:
+                # Apply Augmentation (Only if flagged above)
+                if should_augment:
                     augmented_versions = augment_audio(seg, sr)
                     for idx, aug_seg in enumerate(augmented_versions):
                         out_path_aug = os.path.join(participant_dir, f"{pid}_seg{i}_aug{idx}.wav")
                         sf.write(out_path_aug, aug_seg, sr)
                         saved_count += 1
                         
-            print(f"✅ Saved {saved_count} segments for {pid} (Capped Base at {MAX_SEGMENTS_PER_PARTICIPANT})")
+            print(f"   ✅ Saved {saved_count} files for {pid}.")
+            
         else:
-            print(f"⚠️ {pid}: 0 segments.")
+            print(f"   ⚠️ {pid}: No valid segments after silence removal.")
 
     except Exception as e:
-        print(f"❌ Error processing {pid}: {e}")
+        print(f"   ❌ Error processing {pid}: {e}")
 
 # --- BATCH PROCESS ---
 def process_dataset():
-    print(f"🚀 STARTING BALANCED PREPROCESSING...")
-    labels_map = load_labels()
+    print(f"🚀 STARTING V2 PREPROCESSING (Split-Aware)...")
+    labels_map, split_map = load_labels_and_splits()
     
     if not os.path.exists(OUT_DIR):
         os.makedirs(OUT_DIR)
@@ -194,15 +228,18 @@ def process_dataset():
         for file in files:
             if file.endswith("_AUDIO.wav"):
                 pid = file.split("_")[0]
+                
                 if pid not in labels_map:
                     continue
                     
                 is_depressed = labels_map[pid]
+                split = split_map.get(pid, 'unknown') # Get 'train' or 'dev'
+                
                 audio_path = os.path.join(root, file)
                 transcript_file = f"{pid}_TRANSCRIPT.csv"
                 transcript_path = os.path.join(root, transcript_file)
                 
-                preprocess_participant(audio_path, transcript_path, OUT_DIR, pid, is_depressed)
+                preprocess_participant(audio_path, transcript_path, OUT_DIR, pid, is_depressed, split)
                 
     print("\n🎉 Preprocessing Complete!")
 

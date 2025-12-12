@@ -14,8 +14,8 @@ from sklearn.neighbors import KNeighborsClassifier
 from xgboost import XGBClassifier
 
 # ================= CONFIGURATION =================
-TRAIN_CSV = r"C:\Users\User\Desktop\depression_train_opensmile.csv"
-MODEL_OUTPUT_DIR = r"C:\Users\User\Desktop\CP2\tuned_models_opensmile"
+TRAIN_CSV = r"C:\Users\User\Desktop\depression_train_dataset.csv"
+MODEL_OUTPUT_DIR = r"C:\Users\User\Desktop\CP2\tuned_models"
 RANDOM_STATE = 42
 
 # Define the "Search Space" for each model
