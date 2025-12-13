@@ -5,14 +5,14 @@ import numpy as np
 from sklearn.metrics import accuracy_score, recall_score, f1_score, confusion_matrix
 
 # ================= CONFIGURATION =================
-# Path to your Test Data (OpenSMILE V8)
-TEST_CSV = r"C:\Users\User\Desktop\depression_test_opensmile.csv"
+TEST_CSV = r"C:\Users\User\Desktop\CP2\depression_test_dataset.csv"
 
 # Path to your Final Ensemble Model
-MODEL_PATH = r"C:\Users\User\Desktop\CP2\final_ensemble_opensmile\Final_Stacking_Ensemble_v8.pkl"
+MODEL_PATH = r"C:\Users\User\Desktop\CP2\ensemble_model\stacking_ensemble.pkl"
 # =================================================
 
 def calculate_specificity(y_true, y_pred):
+    
     tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
     return tn / (tn + fp) if (tn + fp) > 0 else 0
 
@@ -25,7 +25,6 @@ def diagnose_and_tune():
         return
 
     df = pd.read_csv(TEST_CSV)
-    # Align features if necessary (drop meta)
     X_test = df.drop(columns=['PHQ8_Binary', 'participant_id', 'filename'], errors='ignore')
     
     # Keep meta for analysis
@@ -34,9 +33,9 @@ def diagnose_and_tune():
     print(f"   Loading Model: {os.path.basename(MODEL_PATH)}")
     model = joblib.load(MODEL_PATH)
 
-    # 2. Get Probabilities (The critical step)
+    # 2. Get Probabilities 
     print("   Calculating Probabilities...")
-    probs = model.predict_proba(X_test)[:, 1] # Probability of Class 1 (Depressed)
+    probs = model.predict_proba(X_test)[:, 1] 
     df_meta['seg_prob'] = probs
 
     # 3. Aggregate per Participant

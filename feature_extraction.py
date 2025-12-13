@@ -5,21 +5,18 @@ import opensmile
 from tqdm import tqdm
 
 # ================= CONFIGURATION =================
-# Point to your NEW V2 Balanced Folder
 PROCESSED_AUDIO_DIR = r"C:\Users\User\Desktop\processed_balanced_v2" 
 
 # Labels Paths
 TRAIN_LABELS = r"C:\Users\User\Desktop\DAIC-WOZ\train_split_Depression_AVEC2017.csv"
 DEV_LABELS = r"C:\Users\User\Desktop\DAIC-WOZ\dev_split_Depression_AVEC2017.csv"
-# Add Test Labels if you have them, otherwise Dev serves as Test
-# TEST_LABELS = r"C:\Users\User\Desktop\DAIC-WOZ\test_split_Depression_AVEC2017.csv"
 
 # Output Files
 OUTPUT_TRAIN = r"C:\Users\User\Desktop\CP2\depression_train_dataset_v2.csv"
 OUTPUT_TEST = r"C:\Users\User\Desktop\CP2\depression_test_dataset_v2.csv"
 
 # Logic Settings
-MIN_SEGMENTS = 5  # Only used to skip empty/broken folders
+MIN_SEGMENTS = 5  # To skip empty/broken folders
 # =================================================
 
 def extract_opensmile_features():
@@ -47,7 +44,7 @@ def process_split(smile, label_file, output_csv, split_name):
 
     all_features = []
 
-    # Walk through the entire V2 folder (Train and Test subfolders)
+    # Walk through the entire processed folder (Train and Test subfolders)
     for root, _, files in os.walk(PROCESSED_AUDIO_DIR):
         folder_name = os.path.basename(root)
         
@@ -70,12 +67,10 @@ def process_split(smile, label_file, output_csv, split_name):
         
         if split_name == "TRAIN":
             # For Training: Take EVERYTHING (Base + Augmentations)
-            # (Note: These were already capped at 50 in preprocessing)
             final_files = all_wavs
             
         else: # TEST / DEV
             # For Testing: Take EVERYTHING that isn't augmented
-            # DO NOT CAP / LIMIT. We want 100% of the segments for voting.
             final_files = [f for f in all_wavs if "_aug" not in f]
         
         # Skip if folder is empty
@@ -114,12 +109,11 @@ def main():
     smile = extract_opensmile_features()
     
     # 1. Process Train 
-    # (Will find files in processed_balanced_v2/train/...)
+    # Will find files in the processed\training
     process_split(smile, TRAIN_LABELS, OUTPUT_TRAIN, "TRAIN")
     
     # 2. Process Test/Dev
-    # (Will find files in processed_balanced_v2/test/...)
-    # This ensures we get ALL valid segments for the test set
+    # Will find files in processed\testing
     process_split(smile, DEV_LABELS, OUTPUT_TEST, "TEST")
     
     print("\n🎉 DONE! Features extracted.")

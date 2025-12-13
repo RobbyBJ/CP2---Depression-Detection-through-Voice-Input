@@ -12,19 +12,19 @@ from tqdm import tqdm
 DATASET_DIR = r"C:\Users\User\Desktop\DAIC-WOZ"
 OUT_DIR = r"C:\Users\User\Desktop\processed_balanced_v2"
 
-# Path to labels
+# Path to the label files
 TRAIN_LABELS = r"C:\Users\User\Desktop\DAIC-WOZ\train_split_Depression_AVEC2017.csv"
 DEV_LABELS = r"C:\Users\User\Desktop\DAIC-WOZ\dev_split_Depression_AVEC2017.csv"
 
 # --- BALANCING SETTINGS (Applies to TRAIN only) ---
-MAX_SEGMENTS_PER_PARTICIPANT = 50  # Cap training data to prevent bias
+MAX_SEGMENTS_PER_PARTICIPANT = 75 # Cap training data to prevent bias
 AUGMENT_DEPRESSED_ONLY = True      # Augment minority class in training
 # =================================================
 
 # --- HELPER: Load Labels & Split Info ---
 def load_labels_and_splits():
     labels_map = {}
-    split_map = {} # New: Tracks if a user is 'train', 'dev', or 'test'
+    split_map = {} 
     
     # 1. Load Train
     if os.path.exists(TRAIN_LABELS):
@@ -33,7 +33,7 @@ def load_labels_and_splits():
         for _, row in df.iterrows():
             pid = str(int(row['participant_id']))
             labels_map[pid] = row['PHQ8_Binary']
-            split_map[pid] = 'train' # Mark as TRAIN
+            split_map[pid] = 'train' 
 
     # 2. Load Dev
     if os.path.exists(DEV_LABELS):
@@ -42,7 +42,7 @@ def load_labels_and_splits():
         for _, row in df.iterrows():
             pid = str(int(row['participant_id']))
             labels_map[pid] = row['PHQ8_Binary']
-            split_map[pid] = 'dev'   # Mark as DEV
+            split_map[pid] = 'dev'   
 
     return labels_map, split_map
 
@@ -105,7 +105,7 @@ def normalize_audio(y):
     return librosa.util.normalize(y)
 
 # --- STEP 6: Segmentation ---
-def segment_audio(y, sr, segment_length=3.0, overlap=0.5):
+def segment_audio(y, sr, segment_length=5.0, overlap=0.5):
     seg_samples = int(segment_length * sr)
     step = int(seg_samples * (1 - overlap))
     segments = []
@@ -142,13 +142,9 @@ def augment_audio(y, sr):
 
 # --- MAIN PROCESSING LOOP ---
 def preprocess_participant(audio_path, transcript_path, out_dir, pid, is_depressed, split):
-    # Determine folder based on split (Optional organization)
-    # This helps you manually check later
     split_folder = "train" if split == "train" else "test"
     participant_dir = os.path.join(out_dir, split_folder, pid)
     
-    # Check if already processed to save time (Optional)
-    # if os.path.exists(participant_dir): return 
 
     print(f"Processing {pid} ({split.upper()} | Depressed: {is_depressed})...")
 
@@ -168,7 +164,7 @@ def preprocess_participant(audio_path, transcript_path, out_dir, pid, is_depress
 
         if segments:
             # ==========================================
-            # 🧠 INTELLIGENT SPLIT LOGIC
+            # (TRAIN ONLY) SPLIT LOGIC
             # ==========================================
             
             # 1. TRAINING SET: Apply Cap & Augmentation
@@ -182,9 +178,9 @@ def preprocess_participant(audio_path, transcript_path, out_dir, pid, is_depress
                 # B. Augment Depressed (ONLY in Train)
                 should_augment = (AUGMENT_DEPRESSED_ONLY and is_depressed == 1)
 
-            # 2. TEST/DEV SET: Keep Everything!
+            # 2. Keep all segments for dev/test set
             else:
-                # Do NOT cap. Do NOT augment.
+                # Ensures no capping or augmentation in dev/test
                 print(f"   🛡️ Keeping ALL {len(segments)} segments (Test Integrity).")
                 should_augment = False
 
@@ -233,7 +229,7 @@ def process_dataset():
                     continue
                     
                 is_depressed = labels_map[pid]
-                split = split_map.get(pid, 'unknown') # Get 'train' or 'dev'
+                split = split_map.get(pid, 'unknown') 
                 
                 audio_path = os.path.join(root, file)
                 transcript_file = f"{pid}_TRANSCRIPT.csv"

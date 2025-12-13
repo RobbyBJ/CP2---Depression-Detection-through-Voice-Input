@@ -7,10 +7,9 @@ from sklearn.metrics import (
 )
 
 # ================= CONFIGURATION =================
-# Point to your V2 Full Test Set
-TEST_DATASET = r"C:\Users\User\Desktop\depression_test_dataset_v2.csv"
-MODEL_DIR = r"C:\Users\User\Desktop\CP2\baseline_models"
-OUTPUT_RESULTS = r"C:\Users\User\Desktop\baseline_results_v2.csv"
+TEST_DATASET = r"C:\Users\User\Desktop\CP2\depression_test_dataset_v2.csv"
+MODEL_DIR = r"C:\Users\User\Desktop\CP2\ensemble_model_v2"
+OUTPUT_RESULTS = r"C:\Users\User\Desktop\CP2\stacking_ensemble_v2.csv"
 
 #  MANUAL THRESHOLD SETTING
 MANUAL_THRESHOLD = 0.50
@@ -83,7 +82,6 @@ def main():
             scores, labels = get_participant_scores(model, X_test_aligned, df_meta)
             
             # 2. Apply Manual Threshold
-            # If score >= 0.32, predict 1 (Depressed)
             y_pred = (scores >= MANUAL_THRESHOLD).astype(int)
             
             # 3. Calculate Metrics
@@ -120,8 +118,6 @@ def main():
         # Print detailed report for the best model
         best_model_name = res_df.iloc[0]['Model']
         print(f"\n📝 Detailed Report for Best Model: {best_model_name}")
-        # (You would need to reload the model to print the full classification report, 
-        # but the summary table above is usually enough)
 
 if __name__ == "__main__":
     main()

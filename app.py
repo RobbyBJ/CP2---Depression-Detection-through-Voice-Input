@@ -12,10 +12,10 @@ from scipy.signal import butter, lfilter
 
 # ================= CONFIGURATION =================
 # 1. Path to your Best Model (Simple Stack)
-MODEL_PATH = "final_ensemble_opensmile/stacking_ensemble.pkl"
+MODEL_PATH = "ensemble_model/stacking_ensemble.pkl"
 
 # 2. Your Calibrated Threshold
-THRESHOLD = 0.32
+THRESHOLD = 0.34
 
 # 3. Audio Settings (Must match Training V8)
 SEGMENT_DURATION = 3.0 
@@ -33,7 +33,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. PREPROCESSING FUNCTIONS (Exact Match to V8 Pipeline) ---
+# --- 2. PREPROCESSING FUNCTIONS  ---
 
 def butter_bandpass(lowcut, highcut, fs, order=5):
     nyq = 0.5 * fs
@@ -182,7 +182,6 @@ if model and smile:
                     
                     # --- RESULT DISPLAY ---
                     if pred == 1:
-                        # Visual trick: map threshold (0.32) to 50% visual scale for user intuition
                         display_score = min(risk_score * 100, 99)
                         st.markdown(f"""
                             <div class="result-box depressed">
@@ -225,7 +224,6 @@ if model and smile:
                     "Risk Probability": seg_probs
                 })
                 
-                # FIX: Use the exact column name "Segment (3s)"
                 st.line_chart(chart_df.set_index("Segment (3s)"))
                 st.caption(f"Any segment above {THRESHOLD} contributes to a positive diagnosis.")
 
