@@ -7,7 +7,7 @@ from sklearn.metrics import accuracy_score, recall_score, f1_score, confusion_ma
 # ================= CONFIGURATION =================
 TEST_CSV = r"C:\Users\User\Desktop\CP2\depression_test_dataset.csv"
 # Make sure this points to your latest trained model
-MODEL_PATH = r"C:\Users\User\Desktop\CP2\ensemble_model\stacking_ensemble.pkl"
+MODEL_PATH = r"C:\Users\User\Desktop\CP2\ensemble_models\voting_ensemble.pkl"
 # =================================================
 
 def calculate_specificity(y_true, y_pred):

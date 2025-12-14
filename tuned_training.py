@@ -18,9 +18,8 @@ from imblearn.over_sampling import SMOTE
 
 # ================= CONFIGURATION =================
 TRAIN_CSV = r"C:\Users\User\Desktop\CP2\depression_train_dataset.csv"
-MODEL_OUTPUT_DIR = r"C:\Users\User\Desktop\CP2\tuned_models" 
+MODEL_OUTPUT_DIR = r"C:\Users\User\Desktop\CP2\tuned_models_v2" 
 RANDOM_STATE = 42
-SENSITIVE_WEIGHTS = {0: 1.0, 1: 2.0}
 # =================================================
 
 os.makedirs(MODEL_OUTPUT_DIR, exist_ok=True)
@@ -56,7 +55,7 @@ def run_tuning():
     
     MODEL_PARAMS = {
         'SVM': {
-            'model': SVC(probability=True, random_state=RANDOM_STATE, class_weight=SENSITIVE_WEIGHTS),
+            'model': SVC(probability=True, random_state=RANDOM_STATE, class_weight={0: 1.0, 1: 3.0}),
             'params': {
                 'classifier__C': [0.1, 1, 10],
                 'classifier__kernel': ['rbf'],
@@ -64,7 +63,7 @@ def run_tuning():
             }
         },
         'RandomForest': {
-            'model': RandomForestClassifier(random_state=RANDOM_STATE, n_jobs=-1, class_weight=SENSITIVE_WEIGHTS),
+            'model': RandomForestClassifier(random_state=RANDOM_STATE, n_jobs=-1, class_weight={0: 1.0, 1: 3.0}),
             'params': {
                 'classifier__n_estimators': [100, 200],
                 'classifier__max_depth': [10, 20],
@@ -73,7 +72,7 @@ def run_tuning():
             }
         },
         'LogisticRegression': {
-            'model': LogisticRegression(random_state=RANDOM_STATE, max_iter=2000, class_weight=SENSITIVE_WEIGHTS),
+            'model': LogisticRegression(random_state=RANDOM_STATE, max_iter=2000, class_weight={0: 1.0, 1: 4.0}),
             'params': {
                 'classifier__C': [0.01, 0.1, 1, 10],
                 'selector__n_features_to_select': [20, 30, 40]
@@ -86,9 +85,9 @@ def run_tuning():
         ]),
      
             'params': {
-                'classifier__classifier__n_neighbors': [5, 7, 9, 11], 
+                'classifier__classifier__n_neighbors': [5, 7, 9], 
                 'classifier__classifier__weights': ['uniform', 'distance'],
-                'selector__n_features_to_select': [20, 30, 40] 
+                'selector__n_features_to_select': [20, 30] 
             }
         },
         'XGBoost': {
@@ -100,7 +99,7 @@ def run_tuning():
                 'classifier__learning_rate': [0.01, 0.1],
                 'classifier__max_depth': [3, 5],
                 'classifier__n_estimators': [100, 200],
-                'selector__n_features_to_select': [20, 30, 40]
+                'selector__n_features_to_select': [20, 30]
             }
         }
     }

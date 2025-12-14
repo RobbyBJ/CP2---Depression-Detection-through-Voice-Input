@@ -15,10 +15,10 @@ from scipy.signal import butter, lfilter
 MODEL_PATH = "ensemble_model/stacking_ensemble.pkl"
 
 # 2. Your Calibrated Threshold
-THRESHOLD = 0.34
+THRESHOLD = 0.4
 
-# 3. Audio Settings (Must match Training V8)
-SEGMENT_DURATION = 3.0 
+# 3. Audio Settings 
+SEGMENT_DURATION = 5.0 
 SR = 16000
 # =================================================
 
@@ -76,7 +76,6 @@ def preprocess_audio_signal(y, sr):
     return y
 
 # --- 3. BACKEND FUNCTIONS ---
-
 @st.cache_resource
 def load_model():
     if not os.path.exists(MODEL_PATH):
@@ -172,7 +171,7 @@ if model and smile:
             st.audio(uploaded_file, format='audio/wav')
             
             if st.button("Run Clinical Screening", type="primary"):
-                with st.spinner("Applying V8 Pipeline (Cleaning & Feature Extraction)..."):
+                with st.spinner("Applying Pipeline (Cleaning & Feature Extraction)..."):
                     pred, risk_score, y_display, seg_probs = process_and_predict(uploaded_file, model, smile)
                 
                 if pred is None:
@@ -233,5 +232,5 @@ if model and smile:
                 1.  **Preprocessing:** Noise Reduction (-20dB), Bandpass Filter (300-3400Hz), Silence Removal.
                 2.  **Extraction:** OpenSMILE eGeMAPS (88 Features: Jitter, Shimmer, HNR, F1-F3).
                 3.  **Model:** Stacking Ensemble (Logistic Regression Meta-Learner).
-                4.  **Logic:** Majority voting with a **0.32** probability threshold.
+                4.  **Logic:** Majority voting with a **0.5** probability threshold.
                 """)

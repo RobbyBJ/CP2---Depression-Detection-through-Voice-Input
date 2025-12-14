@@ -5,7 +5,7 @@ import opensmile
 from tqdm import tqdm
 
 # ================= CONFIGURATION =================
-PROCESSED_AUDIO_DIR = r"C:\Users\User\Desktop\processed_audio_files" 
+PROCESSED_AUDIO_DIR = r"C:\Users\User\Desktop\processed_audio_clean" 
 
 # Labels Paths
 TRAIN_LABELS = r"C:\Users\User\Desktop\DAIC-WOZ\train_split_Depression_AVEC2017.csv"

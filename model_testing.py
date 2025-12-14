@@ -8,11 +8,11 @@ from sklearn.metrics import (
 
 # ================= CONFIGURATION =================
 TEST_DATASET = r"C:\Users\User\Desktop\CP2\depression_test_dataset.csv"
-MODEL_DIR = r"C:\Users\User\Desktop\CP2\ensemble_model"
-OUTPUT_RESULTS = r"C:\Users\User\Desktop\CP2\ensemble__results.csv"
+MODEL_DIR = r"C:\Users\User\Desktop\CP2\ensemble_model_v2"
+OUTPUT_RESULTS = r"C:\Users\User\Desktop\CP2\ensemble_results_v3.csv"
 
 #  MANUAL THRESHOLD SETTIN
-MANUAL_THRESHOLD = 0.50
+MANUAL_THRESHOLD = 0.5
 # =================================================
 
 def calculate_specificity(y_true, y_pred):
