@@ -8,14 +8,9 @@ from sklearn.model_selection import StratifiedKFold
 from sklearn.metrics import accuracy_score, recall_score, f1_score
 
 # ================= CONFIGURATION =================
-# 1. Path to train dataset
 TRAIN_CSV = r"C:\Users\User\Desktop\CP2\depression_train_dataset.csv"
-
-# 2. Path to tuned models
-TUNED_MODEL_DIR = r"C:\Users\User\Desktop\CP2\tuned_models_v2"
-
-# 3. Output for the Final Ensemble model
-OUTPUT_DIR = r"C:\Users\User\Desktop\CP2\ensemble_model_v2"
+TUNED_MODEL_DIR = r"C:\Users\User\Desktop\CP2\tuned_models"
+OUTPUT_DIR = r"C:\Users\User\Desktop\CP2\ensemble_models"
 # =================================================
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -68,7 +63,7 @@ def train_stacking():
     stacking_clf = StackingClassifier(
         estimators=estimators,
         final_estimator=LogisticRegression(
-            class_weight='balanced',  # <--- THIS IS THE KEY FIX
+            class_weight='balanced',  
             random_state=42,
             max_iter=2000
         ),

@@ -48,8 +48,7 @@ def run_training():
     print(f"   XGBoost Scale Weight: {scale_pos_weight:.2f}")
 
     # ================= DEFINE RFE SELECTOR =================
-    # Use a simple Decision Tree to judge feature importance for the RFE step.
-    # Fast and effective at finding non-linear relationships.
+    # Simple Decision Tree to judge feature importance for the RFE step.
     rfe_selector = RFE(
         estimator=DecisionTreeClassifier(random_state=RANDOM_STATE),
         n_features_to_select=N_FEATURES_TO_KEEP,
@@ -57,12 +56,11 @@ def run_training():
     )
 
     # ================= DEFINE MODELS =================
-    # Added class_weight='balanced' to boost Sensitivity
     models_config = {
         'SVM': SVC(
             random_state=RANDOM_STATE, 
             probability=True, 
-            class_weight='balanced'  # <--- BOOST SENSITIVITY
+            class_weight='balanced'  
         ),
         
         'RandomForest': RandomForestClassifier(
@@ -70,16 +68,16 @@ def run_training():
             n_estimators=200, 
             max_depth=10, 
             n_jobs=-1,
-            class_weight='balanced'  # <--- BOOST SENSITIVITY
+            class_weight='balanced'  
         ),
         
         'LogisticRegression': LogisticRegression(
             random_state=RANDOM_STATE, 
             max_iter=2000,
-            class_weight='balanced'  # <--- BOOST SENSITIVITY
+            class_weight='balanced' 
         ),
         
-        'KNN': KNeighborsClassifier(n_neighbors=9), # KNN doesn't support class_weights natively
+        'KNN': KNeighborsClassifier(n_neighbors=9), 
         
         'XGBoost': XGBClassifier(
             n_estimators=100, 
@@ -88,7 +86,7 @@ def run_training():
             tree_method='hist', 
             eval_metric='logloss', 
             random_state=RANDOM_STATE,
-            scale_pos_weight=scale_pos_weight  # <--- BOOST SENSITIVITY
+            scale_pos_weight=scale_pos_weight  
         )
     }
 

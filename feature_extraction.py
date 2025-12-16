@@ -16,7 +16,7 @@ OUTPUT_TRAIN = r"C:\Users\User\Desktop\CP2\depression_train_dataset.csv"
 OUTPUT_TEST = r"C:\Users\User\Desktop\CP2\depression_test_dataset.csv"
 
 # Logic Settings
-MIN_SEGMENTS = 5  # To skip empty/broken folders
+MIN_SEGMENTS = 5  
 # =================================================
 
 def extract_opensmile_features():
@@ -62,7 +62,7 @@ def process_split(smile, label_file, output_csv, split_name):
         all_wavs = [f for f in files if f.endswith('.wav')]
         
         # ==========================================
-        # 🧠 SELECTION LOGIC
+        #  SELECTION LOGIC
         # ==========================================
         
         if split_name == "TRAIN":
@@ -107,13 +107,8 @@ def process_split(smile, label_file, output_csv, split_name):
 
 def main():
     smile = extract_opensmile_features()
-    
-    # 1. Process Train 
-    # Will find files in the processed\training
+
     process_split(smile, TRAIN_LABELS, OUTPUT_TRAIN, "TRAIN")
-    
-    # 2. Process Test/Dev
-    # Will find files in processed\testing
     process_split(smile, DEV_LABELS, OUTPUT_TEST, "TEST")
     
     print("\n🎉 DONE! Features extracted.")

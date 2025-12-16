@@ -8,10 +8,10 @@ from sklearn.metrics import (
 
 # ================= CONFIGURATION =================
 TEST_DATASET = r"C:\Users\User\Desktop\CP2\depression_test_dataset.csv"
-MODEL_DIR = r"C:\Users\User\Desktop\CP2\ensemble_model_v2"
-OUTPUT_RESULTS = r"C:\Users\User\Desktop\CP2\ensemble_results_v3.csv"
+MODEL_DIR = r"C:\Users\User\Desktop\CP2\baseline_models"
+OUTPUT_RESULTS = r"C:\Users\User\Desktop\CP2\baseline_results.csv"
 
-#  MANUAL THRESHOLD SETTIN
+#  MANUAL THRESHOLD SETTING
 MANUAL_THRESHOLD = 0.5
 # =================================================
 

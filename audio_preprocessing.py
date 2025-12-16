@@ -8,11 +8,9 @@ import random
 from scipy.signal import butter, lfilter
 from tqdm import tqdm
 
-# ================= CONFIGURATION =================
 DATASET_DIR = r"C:\Users\User\Desktop\DAIC-WOZ"
 OUT_DIR = r"C:\Users\User\Desktop\processed_audio_files"
 
-# Path to the label files
 TRAIN_LABELS = r"C:\Users\User\Desktop\DAIC-WOZ\train_split_Depression_AVEC2017.csv"
 DEV_LABELS = r"C:\Users\User\Desktop\DAIC-WOZ\dev_split_Depression_AVEC2017.csv"
 

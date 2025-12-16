@@ -6,10 +6,10 @@ from sklearn.ensemble import VotingClassifier
 
 # ================= CONFIGURATION =================
 TRAIN_CSV = r"C:\Users\User\Desktop\CP2\depression_train_dataset.csv"
-MODEL_DIR = r"C:\Users\User\Desktop\CP2\tuned_models_v2"
+MODEL_DIR = r"C:\Users\User\Desktop\CP2\tuned_models"
 OUTPUT_PATH = r"C:\Users\User\Desktop\CP2\ensemble_models\voting_ensemble.pkl"
 
-# Weights (Based on our "Council" strategy)
+# Weights 
 # KNN (Acc) gets 2.0
 # LogReg (Sens) gets 1.2
 # SVM (Balance) gets 1.0
@@ -61,8 +61,6 @@ def build_production_model():
     )
 
     # 4. Fit on FULL Data
-    # We retrain the ensemble on the data so it's fresh for the app.
-    # Note: It uses the Hyperparameters we already tuned (C=10, k=5, etc.)
     print("\n   🧠 Training final ensemble on full dataset...")
     voting_clf.fit(X_train, y_train)
 

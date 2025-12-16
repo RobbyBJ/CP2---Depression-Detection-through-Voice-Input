@@ -11,13 +11,12 @@ import noisereduce as nr
 from scipy.signal import butter, lfilter
 
 # ================= CONFIGURATION =================
-# 1. Path to your Best Model (Simple Stack)
-MODEL_PATH = "ensemble_model/stacking_ensemble.pkl"
+MODEL_PATH = "ensemble_models/stacking_ensemble.pkl"
 
-# 2. Your Calibrated Threshold
+# Calibrated Threshold
 THRESHOLD = 0.4
 
-# 3. Audio Settings 
+# Audio Settings 
 SEGMENT_DURATION = 5.0 
 SR = 16000
 # =================================================
@@ -34,7 +33,6 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # --- 2. PREPROCESSING FUNCTIONS  ---
-
 def butter_bandpass(lowcut, highcut, fs, order=5):
     nyq = 0.5 * fs
     low = lowcut / nyq

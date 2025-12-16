@@ -18,7 +18,7 @@ from imblearn.over_sampling import SMOTE
 
 # ================= CONFIGURATION =================
 TRAIN_CSV = r"C:\Users\User\Desktop\CP2\depression_train_dataset.csv"
-MODEL_OUTPUT_DIR = r"C:\Users\User\Desktop\CP2\tuned_models_v2" 
+MODEL_OUTPUT_DIR = r"C:\Users\User\Desktop\CP2\tuned_models" 
 RANDOM_STATE = 42
 # =================================================
 
@@ -32,8 +32,7 @@ def run_tuning():
 
     df_train = pd.read_csv(TRAIN_CSV)
     
-    # 1. EXTRACT GROUPS (Patient IDs) BEFORE DROPPING THEM
-    # This is critical for StratifiedGroupKFold to prevent leakage
+    # 1. Extract patient_ID. This is critical for StratifiedGroupKFold to prevent leakage
     groups = df_train['participant_id'] 
     
     X_train = df_train.drop(columns=['PHQ8_Binary', 'participant_id', 'filename'], errors='ignore')
@@ -51,8 +50,7 @@ def run_tuning():
     print(f"   XGBoost Scale Weight: {scale_pos_weight:.2f}")
 
     # ================= DEFINE GRID SEARCH SPACE =================
-    # We tune both the Model Hyperparameters AND the number of RFE features
-    
+    # Tuning both the model hyperparameters & the number of RFE features
     MODEL_PARAMS = {
         'SVM': {
             'model': SVC(probability=True, random_state=RANDOM_STATE, class_weight={0: 1.0, 1: 3.0}),
@@ -67,7 +65,7 @@ def run_tuning():
             'params': {
                 'classifier__n_estimators': [100, 200],
                 'classifier__max_depth': [10, 20],
-                'classifier__min_samples_leaf': [2, 4], # Higher leaf count prevents overfitting
+                'classifier__min_samples_leaf': [2, 4], 
                 'selector__n_features_to_select': [20, 30, 40]
             }
         },
@@ -108,7 +106,7 @@ def run_tuning():
     print("   (Using StratifiedGroupKFold to prevent leakage)\n")
 
     # 2. USE STRATIFIED GROUP K-FOLD
-    # Splits by PATIENT, not by SEGMENT.
+    # Splits by patient, not segment
     cv = StratifiedGroupKFold(n_splits=3)
 
     for name, config in MODEL_PARAMS.items():
@@ -125,7 +123,6 @@ def run_tuning():
         ])
 
         # Grid Search
-        # scoring='recall' optimizes for SENSITIVITY
         grid = GridSearchCV(
             pipeline, 
             config['params'], 
@@ -151,7 +148,6 @@ def run_tuning():
             print(f"   ❌ Failed {name}: {e}\n")
 
     print(f"🎉 Tuning Complete. Models saved to: {MODEL_OUTPUT_DIR}")
-    print("👉 Update your 'test_v9_soft_voting.py' to point to this new folder!")
 
 if __name__ == "__main__":
     run_tuning()
