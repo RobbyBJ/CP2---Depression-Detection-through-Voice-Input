@@ -47,13 +47,7 @@ def bandpass_filter(data, lowcut=300, highcut=3400, fs=16000, order=5):
     return y
 
 def preprocess_audio_signal(y, sr):
-    """
-    Applies the full V8 cleaning pipeline:
-    1. Noise Reduction
-    2. Bandpass Filter
-    3. Silence Removal
-    4. Normalization
-    """
+
     # 1. Noise Reduction
     try:
         y = nr.reduce_noise(y=y, sr=sr, stationary=True, prop_decrease=0.75)

@@ -212,7 +212,7 @@ def preprocess_participant(audio_path, transcript_path, out_dir, pid, is_depress
 
 # --- BATCH PROCESS ---
 def process_dataset():
-    print(f"🚀 STARTING V2 PREPROCESSING (Split-Aware)...")
+    print(f"🚀 STARTING PREPROCESSING...")
     labels_map, split_map = load_labels_and_splits()
     
     if not os.path.exists(OUT_DIR):
